@@ -2,7 +2,8 @@ library(shiny)
 
 library(data.table)
 library(dplyr) 
-tangram <- fread("http://statgames.tietronix.com/tangrams/webreporter.php?game=tangrams&GroupName=&winlose=both&random=false&rows=&type=csv")
+##tangram <- fread("http://statgames.tietronix.com/tangrams/webreporter.php?game=tangrams&GroupName=&winlose=both&random=false&rows=&type=csv")
+tangram <- read.csv("tangrams_data.csv",stringsAsFactors = FALSE)
 factorchoice <- c("Gender" = "level_gender",
             "STEM" = "level_stem",
             "Athlete"="level_athl")

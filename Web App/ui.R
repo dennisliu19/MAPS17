@@ -64,8 +64,8 @@ ui <- dashboardPage(
         title = "T-Test Statistics",
         status="primary",
         solidHeader = TRUE,
-        collapsible = TRUE
-        ,textOutput("text1")
+        collapsible = TRUE,
+        textOutput("text1")
       )
     ),
     column(width=6,
@@ -84,7 +84,8 @@ ui <- dashboardPage(
                title = "ANOVA Statistics",
                solidHeader = TRUE,
                collapsible = TRUE,
-               textOutput("text2"))
+               dataTableOutput('anovaSummary')
+               )
         )
        )
       )

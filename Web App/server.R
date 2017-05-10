@@ -29,17 +29,17 @@ function(input, output,session) {
         geom_point(data = exclude, shape = 21, size = 4, fill = NA, color = "black", alpha = 0.25)
     }
   })
-
-  output$toggled_table <- renderDataTable(plot_data()[!vals$keeprows,c(1:20)],
+  
+  output$toggled_table <- renderDataTable(plot_data()[!vals$keeprows,],
                                           options = list(
-                                            pageLength = 5,
+                                            pageLength = 5, 
                                             scrollX = TRUE))
-                                            
+  
   # Toggle points that are clicked
   observeEvent(input$bygroup_plot1_click, {
     res <- nearPoints(plot_data(), input$bygroup_plot1_click, allRows = TRUE)
     isolate({vals$keeprows <- xor(vals$keeprows, res$selected_)})
-
+    
   })
   
   # Toggle points that are brushed, when button is clicked
@@ -90,12 +90,54 @@ function(input, output,session) {
       tangram$transformation <- sqrt(tangram$transformation)
     }
     if(input$factor == "level_gender"){
-      tangram <- tangram[tangram$level_gender == "F" | tae) {
-      summary(aov(transformation ~ Factor,data = ttestdata()))
-    } else {
-      #ttestdata()$aovfac <- input$factor
-      #ttestdata()$aovadd <- input$additional_factor
-    summary(aov(transformation~Factor,data = ttestdata()))
+      tangram <- tangram[tangram$level_gender == "F" | tangram$level_gender == "M",]
+      tangram$Factor <- tangram$level_gender
     }
-    })
+    if(input$factor == "level_stem"){
+      tangram <- tangram[tangram$level_stem == "Y" | tangram$level_stem == "N",]
+      tangram$Factor <- tangram$level_stem
+    }   
+    if(input$factor == "level_athl"){
+      tangram <- tangram[tangram$level_athl == "Y" | tangram$level_athl == "N",]
+      tangram$Factor <- tangram$level_athl
+    }
+    tangram[tangram$GroupName %in% input$byfactorid,]
+  })
+  
+  
+  output$plot1 <- renderPlot({
+    ggplot(ttestdata(),aes(Factor,transformation)) +
+      geom_boxplot(varwidth = TRUE,fill = "white", colour = "#3366FF",
+                   outlier.colour = "red", outlier.shape = 1)
+  })
+  output$text1 <- renderText({
+    paste("P-value for",input$factor, "is", t.test(transformation ~ Factor,data=ttestdata())$p.value)
+  })
+
+  ### ANOVA
+  
+  output$plot2 <- renderPlot({
+    if (input$additional_factor == "None") {
+      ggplot(ttestdata(),aes(Factor,transformation)) +
+        geom_boxplot(varwidth = TRUE,fill = "white", colour = "#3366FF",
+                     outlier.colour = "red", outlier.shape = 1)
+    } else {
+      ggplot(ttestdata(),aes_string(x = input$additional_factor, y = "transformation")) +
+        geom_boxplot(aes(fill=Factor),colour = "#3366FF",
+                     outlier.colour = "red", outlier.shape = 1) 
+    }
+  })
+  
+  output$anovaSummary <- renderDataTable(
+    if (input$additional_factor == "None") {
+      return (isolate(anova(transformation ~ Factor, data = ttestdata())))
+    } else {
+      if (length(unique(ttestdata()[,input$additional_factor])) < 2) {
+        return (isolate(data.table(variable = c(input$Factor),
+                                   anova(lm(transformation ~ Factor, data = ttestdata())))))
+      } else {
+        return (isolate(data.table(variable = c(input$Factor,input$additional_factor),
+                                   (anova(lm(ttestdata()$transformation ~ Factor+ttestdata()[,input$additional_factor], data = ttestdata()))))))
+      }
+    }, options = list(scrollX = TRUE))
 }
