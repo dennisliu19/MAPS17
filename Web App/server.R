@@ -137,7 +137,7 @@ function(input, output,session) {
                                    anova(lm(transformation ~ Factor, data = ttestdata())))))
       } else {
         return (isolate(data.table(variable = c(input$Factor,input$additional_factor),
-                                   (anova(lm(ttestdata()$transformation ~ Factor+ttestdata()[,input$additional_factor], data = ttestdata()))))))
+                                   (anova(lm(transformation ~ Factor+ttestdata()[,input$additional_factor], data = ttestdata()))))))
       }
     }, options = list(scrollX = TRUE))
 }
