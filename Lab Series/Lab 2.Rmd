@@ -1,0 +1,147 @@
+---
+title: 'Lab 02: Analysis of Variance (ANOVA)'
+author: "Trang Nguyen, Dennis Liu"
+date: "05/10/2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+## Objective
+Today's lab is the second one in the lab series *Lab: Bad Practices of Experimental Design and Statistical Analysis*. As mentioned in the first lab (*Lab 01: How is T-test Unreliable?*), this lab aims at introducing *ANOVA* as a better alternative to t-test in answering the question **Does Gender influence the game completion time?**  
+  
+## About ANOVA
+**ANOVA** is an acronym for *Analysis of Variance*. This technique is applied to categorical explanatory variables (called *factor*) and continuous response variable. The advantage of ANOVA is that it can take multiple explanatory variables into consideration. Therefore, compared to *t-test*, *ANOVA* can minimize the influence of lurking variables on analysis results.    
+
+## Lab Activity
+**Set up RMarkdown **: The default option of this RMarkdown is (1) code chunks are run to display the result (**eval**=TRUE), and (2) code chunks are displayed (**echo**=TRUE). You can turn off either option by changing the value to *FALSE*.   
+
+```{r setup, message=FALSE, warning=FALSE}
+if (!("knitr" %in% installed.packages())) {
+  install.packages("knitr")
+}
+library(knitr)
+opts_chunk$set(echo = TRUE, eval = TRUE, message=FALSE, warning=FALSE, fig.align="center")
+```
+
+**R Packages to Use**:  This lab will mainly use `dplyr` and `data.table` to clean data, and `ggplot2` to visualize data.   
+```{r}
+# List of packages to be used
+pkg <- c("dplyr", "ggplot2", "plyr", "data.table")
+# Check if any package is not installed
+pkg_install <- pkg[!(pkg %in% installed.packages())]
+if (length(pkg_install)) {
+  install.packages(pkg_install)
+}
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+```
+### 1. Getting Data
+
+To make sure the effectiveness of the analysis, we use the data attached the lab `gentangram.csv`. This data set is the cleaned version of the orginal tangram data set. If you would like to know data cleaning details, please refer to the first lab.  
+
+```{r, message=FALSE, warning=FALSE}
+gen_tangram <- read.csv("gentangram.csv", stringsAsFactors = F)
+```
+
+### 2. Setting up data for ANOVA  
+There are a lot of categorical variables in the data set. Some variables, like *Puzzle Name*, have multiple levels. Since *ANOVA* is basically a between-group comparison, the intuition is that we need to have a good number of observations in each group. The fact that a variable has too many levels will break down the data set into many groups with a few observations only. Therefore, it's important to collapse those levels into some key ones. The following code collapses *Puzzle Name* into 5 main levels.  
+
+```{r}
+puzzlename <- c("A Nice Lighthouse", "Diamond", "House of Tangrams", "The Hook")
+gen_tangram$PuzzleName2 <- ifelse(gen_tangram$PuzzleName %in% puzzlename, gen_tangram$PuzzleName, "Others")
+gen_tangram$PuzzleName2 <- as.factor(gen_tangram$PuzzleName2)
+```
+
+Recall that in the first lab, we observe that *Time Used* has a widely spread distribution. Therefore, we need to use log transformation to reduce its variance. The response variable we will use in the lab will be *TimeUsed_log*.  
+```{r}
+gen_tangram$TimeUsed_log <- log(gen_tangram$TimeUsed)
+gen_tangram$level_gender <- as.factor(gen_tangram$level_gender)
+```
+
+### 3. Using ANOVA
+> Question 1: Conduct ANOVA analysis with 1 factor only - Gender. Compare the result with the t-test result in the first lab. Is there any difference?  
+
+```{r, fig.width=4, fig.height = 3}
+test <- aov(TimeUsed_log ~ level_gender, data=gen_tangram)
+summary(test)
+ggplot(gen_tangram,aes(level_gender,TimeUsed_log)) +
+  geom_boxplot(varwidth = TRUE,fill = "white", colour = "#3366FF",
+               outlier.colour = "red", outlier.shape = 1)  +
+  xlab("Level Gender") +
+  ylab("Log of Time Used")
+```
+
+
+> Question 2: Among all categorical variables given in the data set, besides Gender, what are other factors that might influence the game completion time?  
+
+As mentioned above, the advantage of *ANOVA* is that the model can take multiple factors into consideration. In the following example, we conduct a two-way ANOVA analysis by using 2 explanatory variables: *Gender* (2 levels) and *Puzzle Name* (5 levels).  
+
+> Question 3: Use the following code to run a two-way ANOVA analysis. How does the p-value for Gender change compared to the one-way ANOVA test? What are the additional conclusions you can get from this model?  
+
+```{r}
+test2 <- aov(TimeUsed_log ~ level_gender + PuzzleName2,data=gen_tangram)
+summary(test2)
+
+```
+  
+As you can see from the model, besides 2 main factors, *Gender* and *Puzzle Name*, we have an additional interaction term between *Gender* and *Puzzle Name*. This term demonstrates how each factor influences *Time Used* in each level of the other factor. This is called **interaction effect**. The best way to understand **interaction effect** is by visualizing it on an interaction plot.   
+
+> Question 4: Use the following code to produce relevant plots that visualize the ANOVA model. What can you tell from these plots?  
+
+```{r, fig.width=6, fig.height = 3}
+pd = position_dodge(.2)
+ggplot(gen_tangram,aes(PuzzleName2,TimeUsed_log)) +
+  geom_boxplot(aes(fill=level_gender),colour = "#3366FF",
+               outlier.colour = "red", outlier.shape = 1) +
+  xlab("Puzzle Name (Collapsed)") +
+  ylab("Log of Time Used") + 
+  labs(fill = "Gender")
+```
+
+
+``` {r, fig.width=8, fig.height = 4}
+interaction.plot(gen_tangram$level_gender, gen_tangram$PuzzleName2, gen_tangram$TimeUsed_log, type="b", col=c(1:3), 
+  	leg.bty="o", leg.bg="beige", lwd=2, pch=c(18,24,22),	
+   xlab="Gender", 
+   ylab="Log of Time Used", 
+   main="Interaction Plot",
+   trace.label = "Puzzle Name")
+```
+
+
+> Question 5: The model shows that Puzzle Name can influence the game completion time. Now assume that you are a researcher who has to design a study to investigate the influence of Gender on game completion time. Will you have all subjects do the same puzzle or a variety of puzzles? What is the concern for each approach?  
+
+  
+> Question 6 (More Practice with ANOVA): Choose a third explanatory variable and write code to conduct a three-way ANOVA test. Graph some relevant plots, and write up your results and conclusion.  
+  
+
+### 4. Checking Model Assumption 
+
+Like 2-sample T test to compare population means, two most important model assumptions of ANOVA is the normality and homogeneity of variances of residuals. Therefore, it's necessary to look at the distribution of the model's residuals to assess the reliability of our analysis.  
+
+> Question 7: Use the following code to investigation to distribution of residuals? Is there any significant evidence of model assumption violation?
+
+```{r, fig.width=6, fig.height = 4}
+test_data <- gen_tangram
+test_data$fit <- fitted(test2)
+test_data$res <- resid(test2)
+ggplot(test_data, aes(fit, res, colour = level_gender)) + geom_point() +
+  xlab("Fitted Values") + ylab("Residuals") + facet_wrap(~ PuzzleName2) +
+  labs(fill = "Gender")
+```
+
+```{r, fig.width=4, fig.height=3}
+ggplot(test_data, aes(sample = res)) + stat_qq()
+```
+
+There are many ways to check the assumption of equal variances of residuals, both formal and informal. Some formal tests include Barlett's and Levene's. The former is very sensitive to nonnormality so most cases will not pass this test. The latter is less sensitive. A more common alternative is an informal check: the equal variance assumption is violated when the ratio of maximum and minimum standard deviaitions is greater than 2 (or 3 to less conservative statisticians). (Practicing Statistics, Kuiper & Sklar)
+
+## Some limitations of ANOVA  
+Even though you can have as many factors in an ANOVA model as you want, keep in mind that the model is only reliable when you have a good number of observations in each group. This implies that students must choose a good number of relevant factors to put in the model. This process is often technically called **feature selection**, the selection of the best predictors.  
+ 
+Fortunately, there are a couple of alternatives to make up for these two limitations of ANOVA. The next lab, *Lab 03: CART analysis*, will introduce a new analysis technique, called CART analysis or classification tree. This method is not only good for **feature selection** but can also take both continuous and categorical variables into account.     
+
+

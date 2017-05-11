@@ -1,0 +1,267 @@
+---
+title: 'Lab 1: How is T-test Unreliable?'
+author: "Trang Nguyen, Dennis Liu"
+date: "05/08/2017"
+output:
+  html_document: default
+  word_document: default
+    
+---
+<style type="text/css">
+
+body {
+  font-family: "Times New Roman"
+   font-size: 14px;
+}
+code.r{
+  font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+    font-size: 14px;
+}
+</style>
+
+## Objective
+
+This lab series, which consists of 3 labs, aims at demonstrating some bad practices of experiment design and statistical analysis, and how these bad practices can give misleading conslusions. More particularly, we will look at the impact of __data cleaning__, __lurking variables__ and __sample size__ on statistical conclusions students can draw for the same question. After the lab, students should be able to understand at least 3 things:   
+  __Outliers__: Initial data expoloration to identify outliers is a very important step. These outliers might change your statistical conclusion radically. Therefore, you need to identify outliers and justify whehter to omit or keep those data points.  
+  __Lurking Variables:__ Though it's impossible to put all lurking variables into your analysis, it's important to design an experiment in a way that some lurking variables can be minimized, and to conduct a statistical analysis with the concern that some lurking variables might impact the conclusion.  
+  __SampleSize:__ It is a misconception that all statistical analyses with big data sample give you the right conclusion. A well-designed experiment with 20 subjects might be better than a badly-designed experiment with 200 subjects.   
+
+### Outline:
+1. __Lab 1__: How is T-test Unreliable?  
+  This lab shows the impact of data cleaning on statistical conclusions and how t-tests can give dramatically different   conclusions for the same question.   
+2. __Lab 2__: Analysis of Variance (ANOVA)
+  This lab talks about __Analysis of Variance (ANOVA)__ as a way to avoid lurking or confounding variables.   
+3. __Lab 3__: CART analysis  
+  This lab introduces __CART analysis__, which is a decision tree method to be used in variable selection.    
+
+## Background: 
+### Previous Research on the Impact of Data Cleaning and Model Assumption Checking
+A bigger picture of the reliability of a statistical test is the reproducibility of a study. To be more clear, statistical reproducibility refers to transparent raw data processing from collecting to cleaning (Peng, 2009).  More than 70% of researchers have tried and failed to reproduce another scientist's experiments, and more than half have failed to reproduce their own experiments (Nature, 2016). There have been many cases in which non-reproducible research make it harder to verify the results and cause dangerous consequences to the society.   
+
+Since statistical reproducibility is a big concept, this lab will approach this topic from a specific aspect which is practical and important for student researchers: *what questions a student researcher should him/herself when drawing a statistical conclusion?*. Cummiskey, Kuiper, and Sturdivant (2012) pointed out that though many statistics courses mention model assumptions (for example, normality for *t-test*) and data cleaning, students rarely realize the impact of violated model assumptions or outliers on the conclusions they draw from statistical tests. 
+
+### Data Used: The Tangrams Game and Lab
+Tangrams is an ancient Chinese puzzle where players arrange geometrically shaped pieces into a particular design by flipping, rotating, and moving them. The online Tangrams game allows students the opportunity to design many versions of the original game. You can go to the Tangrams website and leave all the variables blank when you are simply trying out the game. However, if you want to find your completion time in the database of results, a specific course (Group Name) will be needed.  
+
+
+<div style="width:300px; height=200px">
+<center>![Tangram Game Interface](Tangram.png) </center>
+</div>
+
+## Lab Activity  
+In this activity, we will use Tangram database to look at some experiments (identified by __Group Name__) and to look at the collection of all experiments (about _50,000_ observations).  
+
+**Set up RMarkdown **: The default option of this RMarkdown is (1) code chunks are run to display the result (**eval**=TRUE), and (2) code chunks are displayed (**echo**=TRUE). You can turn off either option by changing the value to *FALSE*.   
+
+```{r setup, message=FALSE, warning=FALSE}
+if (!("knitr" %in% installed.packages())) {
+  install.packages("knitr")
+}
+library(knitr)
+opts_chunk$set(echo = TRUE, eval = TRUE, message=FALSE, warning=FALSE)
+```
+
+**R Packages to Use**:  This lab will mainly use `dplyr` and `data.table` to clean data, and `ggplot2` to visualize data.  
+```{r}
+# List of packages to be used
+pkg <- c("dplyr", "ggplot2", "plyr", "data.table")
+# Check if any package is not installed
+pkg_install <- pkg[!(pkg %in% installed.packages())]
+if (length(pkg_install)) {
+  install.packages(pkg_install)
+}
+
+library(data.table)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+```
+
+## 1. Getting Data
+You can import the raw dataset `tangrams_data.csv` into RStudio. This dataset is a collection of all experiments using [Tangrams Game and Lab][http://web.grinnell.edu/individuals/kuipers/stat2labs/Tangrams.html] in the past. Each row is a game trial. Experiments can be identified by __Group Name__.    
+```{r, message=FALSE, warning=FALSE}
+tangram_data <- read.csv("tangrams_data.csv", stringsAsFactors = F)
+```
+
+One alternative to using a local static csv file is to stream data live from the [Tangrams Game and Lab][http://web.grinnell.edu/individuals/kuipers/stat2labs/Tangrams.html] website by using the library `RCurl`. However, for the sake of this lab, students will use the csv file imported as menioned above.  
+
+## 2. Re-formating and Cleaning Data
+### Step 1. Re-formatting Data
+This raw dataset is not ready to be put in any statiscal analysis yet. Therefore, we need to reformat the data into a more accessible form. For the future convinence, we change the type of the column into factor and some into numeric.   
+```{r, message=FALSE, warning=FALSE}
+tangram_data$RequestedTime <- as.numeric(tangram_data$RequestedTime)
+tangram_data$NumClicks <- as.numeric(tangram_data$NumClicks)
+tangram_data$TimeUsed <- as.numeric(tangram_data$TimeUsed)
+tangram_data$NumShapes <- as.numeric(tangram_data$NumShapes)
+```
+
+As mentioned above, we plan to conduct analyses on multiple experiments identified by _Group Name_. However, there are some typos and cap inconsistency in the dataset, which is very typical of self-input data. We made an assumption that _Group Name_ is not case-sensitive so we lower the case of all _Group Name_ entries.   
+```{r, message=FALSE, warning=FALSE}
+tangram_data$GroupName <- tolower(tangram_data$GroupName)
+```
+
+### Step 2. Cleaning Data
+You can see that this dataset is quite big and messy. Therefore, we need some initial data exploration to identify some biaes and outliers. The following plot uses `ggplot` to visualize the _TimeUsed_ variable relative to _HintUsed_. You can use this algorithm and replace the variable names ( _x_ and _y_) to look at other aspects of the dataset.   
+```{r, message=FALSE, warning=FALSE}
+ggplot(data=tangram_data) + geom_point(mapping= aes(x=HintsUsed, y=TimeUsed))
+```
+
+> Question 1: Do you see any extreme outliers? What might be the reasons behind those outliers? How will they impact your later conclusion from the data?  
+
+As in the graph, we can see that there are multiple outliners which are biasing our data. Therefore, we want to eliminate those which are more than 3600 seconds(one hour). We also notice that the range of the data is relatively big. We want to take a log transformation on the data. The new dataset is tangram.   
+```{r, message=FALSE, warning=FALSE}
+tangram <- tangram_data[tangram_data$TimeUsed < 3600,]
+tangram <- tangram[tangram$TimeUsed > 0,]
+tangram$TimeUsed_log <- log(tangram$TimeUsed)
+ggplot(data = tangram, aes(x=interaction(HintsEnabled,HintsUsed,lex.order = TRUE), y=TimeUsed)) + geom_boxplot()  + theme(legend.position="none") + labs(title="Boxplot for filtered data")+xlab("HintsEnabled.HintsUsed")  
+```
+
+
+Besides built-in variables like *Puzzle Name* or *Hint Used*, most researchers are interested in other self-decared variables (which is specificed in the *Factor* column). *Gender* is the most common factor so we want to extract data with gender information from the larger dataset.    
+
+```{r results = "hide", message=FALSE, warning=FALSE}
+tangram <- as.data.frame(tangram)
+### Factor to be filtered: GENDER
+### A set of criteria for regular expressions/ key patterns
+gen = c("^gen","^sex")
+gen_male = c("^m","^h") # english and spanish
+gen_female = c("^f", "^mu") # english and spanish
+
+### ismatch
+### @input: cond: a vector of key patterns (e.g. gen)
+###         x, y, z: 3 columns to look for key
+### @return: 0 if no match
+###          index of the factor (1, 2, 3() if there is match
+ismatch <- function(cond, x, y, z) {
+  x <- grep(paste(cond, collapse = "|"), c(x, y, z), ignore.case = T, value = FALSE)
+  return (ifelse(length(x), as.numeric(x), as.numeric(0)))
+}
+
+### level_gen_fun
+### @input: x is the col index (given by factor_gender)
+###         y is the row index
+### @return: -1 if no gender factor indicated
+###          -2 if gender factor indicated but level_gen key patterns not matched (require future manual check)
+###           M/F
+### @note: this function is specific to gender only. Needs to think about how to generalize it. 
+level_gen_fun <- function(x, y) {
+  return (ifelse(x == 0, -1, 
+                 ifelse(grepl(paste(gen_female, collapse = "|"),tangram[y,2*x+3], ignore.case = T),
+                        "F", 
+                        ifelse(grepl(paste(gen_male, collapse = "|"),tangram[y,2*x+3], ignore.case = T),
+                               "M",-2))))
+}
+
+# Create a column that indicate whether one entry specifies Gender or not
+tangram <- as.data.table(tangram)
+tangram[, factor_gender := ismatch(gen, Factor1, Factor2, Factor3), by = 1:nrow(tangram)]
+
+# Create a column that specifies gender levels (F/ M) if applicable
+tangram <- as.data.frame(tangram)
+tangram$level_gender <- mapply(level_gen_fun, tangram$factor_gender, 1:nrow(tangram), SIMPLIFY = TRUE)
+
+
+# Note: For some reason, the function ismatch does not work for mapply. Therefore, we need to use data table package. 
+```
+
+Now, there are two new columns in our dataset: factor_gender and level_gender. factor_gender indicates that whether this specific data entry contains gender information. *level_gender* indicates the specific gender information. In the level gender column, -1 means there is no gender information at all. -2 means that gender information is indicated, however, it does not match. F means Female and M means Male. We create a new dataset which contains all valid gender information. (`gen_tangram`)
+
+```{r, message=FALSE, warning=FALSE}
+gen_tangram <- tangram[tangram$level_gender == "F"|tangram$level_gender == "M",]
+ggplot(gen_tangram,aes(level_gender,TimeUsed_log)) +
+  geom_boxplot(varwidth = TRUE,fill = "white", colour = "#3366FF",
+               outlier.colour = "red", outlier.shape = 1) 
+```
+
+You can refer to an additional guidline `factor-filter.R` for more detailed instructions regarding creating new factor columns like STEM, age, and major.    
+
+
+# 3. Analyzing Data  
+In this activity, we will use ** T-test ** in big and small datasets and in various ways to answer the same question: __"Does a player's gender influence his or her completion time of a game?"__  
+ 
+Recall that from now on, we will use **gen_tangram** to conduct our analysis.  
+
+We start with the basic __T-test__ on each experiment with ID ( _Group Name_) to see whether the difference in _Time Used (log)_ between _Female_ and _Male_ group is significant at $\alpha = 0.1$.  
+
+> Question 2: Use the following code to conduct t-test on each experiment with ID in the dataset and describe the distribution of p-value?       
+
+```{r results = "hide"}
+
+tangram_pvalue <- as.data.table(gen_tangram)
+tangram_pvalue[, `:=`( SampleSize = .N) , by = GroupName] 
+tangram_pvalue <- tangram_pvalue[tangram_pvalue$SampleSize >= 5,]
+tangram_pvalue[, `:=`(log_timeused_mean = mean(TimeUsed_log), timeused_mean = mean(TimeUsed)), by = c("GroupName", "level_gender")]
+tangram_pvalue[, `:=`(n = .N, sd = sd(TimeUsed_log)), by = c("GroupName", "level_gender")]
+
+ttestFun <- function(dat) {
+  if (sum(dat$level_gender == "F") > 1 && sum(dat$level_gender == "M") > 1) {
+    the_fit <- t.test(TimeUsed_log ~ level_gender, data = dat)
+    #setNames(the_fit$p.value, "p.value")}
+    c("p.value" = the_fit$p.value, "samplesize" = mean(dat$SampleSize))}
+  else {
+    c("p.value" = -1, "samplesize" = mean(dat$SampleSize))
+  }
+}
+alpha <- 0.1
+gender_pval_dist <- ddply(tangram_pvalue, ~ GroupName, ttestFun)
+gender_pval_dist$significant <-(gender_pval_dist$p.value < alpha)*1
+gender_pval_dist$significant <- as.factor(gender_pval_dist$significant)
+```
+```{r}
+ggplot(gender_pval_dist[gender_pval_dist$p.value != -1,], aes(p.value)) +
+  geom_histogram(binwidth = 0.01, position = "identity", alpha = 0.5, colour = "black", fill = "white")
+```
+
+> Question 3: We also want to see how p-value changes relative to the experiment's sample size. Use the following code to draw a scatterplot of p-value vs. sample size. How many experiments show a signficant p-value? Does big sample size guarantee a stable and reliable p-value?    
+
+```{r}
+
+ggplot(gender_pval_dist[gender_pval_dist$p.value != -1,], aes(x = samplesize, y = p.value)) + 
+  geom_point(aes(colour = significant)) +
+  scale_color_manual(values=c("black", "red")) +
+  geom_hline(aes(yintercept = alpha), color = "red") +
+  geom_text(aes(100,0.1,label = "Significant level = 0.1", vjust = -1), color = "red") +
+  scale_x_continuous(name="Sample Size", limits=c(0, 125)) +
+  scale_y_continuous(name="t-test p-value", limits=c(0, 1), breaks = seq(0,1, by = 0.1)) 
+```
+
+
+> Question 4:  Now let's look at the sampling distribution of Female and Male group. Use the following code to visualize the sampling distributuion of Time Used and Time Used (log) in two groups. Do you think there is a significant difference? Explain some concerns in drawing the conclusion.  
+
+```{r results = "hide"}
+gender_samplingdis <- as.data.table(gen_tangram)
+gender_samplingdis[,`:=`(SampleSize = .N), by = GroupName]
+gender_samplingdis[, `:=`(log_timeused_mean = mean(TimeUsed_log), timeused_mean = mean(TimeUsed)), by = c("GroupName", "level_gender")]
+gender_samplingdis[, `:=`(n = .N, sd = sd(TimeUsed_log)), by = c("GroupName", "level_gender")]
+gender_samplingdis <- gender_samplingdis[,c("GroupName", "level_gender", "SampleSize", "timeused_mean", "log_timeused_mean","n","sd"), with = FALSE]
+gender_samplingdis <- gender_samplingdis[!duplicated(gender_samplingdis),]
+
+### Aggregate data for vertical lines
+gender_samplingdis_vline <- gender_samplingdis %>%
+  group_by(level_gender) %>%
+  summarise(log_timeused_mean = mean(log_timeused_mean), timeused_mean = mean(timeused_mean))
+```
+```{r}
+ggplot(gender_samplingdis, aes(timeused_mean, fill = level_gender)) + 
+  geom_density(alpha = 0.3) +
+  geom_vline(data=gender_samplingdis_vline, aes(xintercept=timeused_mean,  colour=level_gender),
+               linetype="dashed", size=1) +
+  labs(title = "Distribution of Sample Means of Different Gender Levels") +
+  labs(x = "Sample Mean", y = "Density") +
+  ylim(0.00, 0.025) +
+  scale_x_continuous(minor_breaks = seq(0, 200, by = 25))
+
+ggplot(gender_samplingdis, aes(log_timeused_mean, fill = level_gender)) + 
+  geom_density(alpha = 0.3) +
+  geom_vline(data=gender_samplingdis_vline, aes(xintercept=log_timeused_mean,  colour=level_gender),
+               linetype="dashed", size=1) +
+  labs(title = "Distribution of Sample Means of Different Gender Levels") +
+  labs(x = "Sample Mean (log)", y = "Density") +
+  ylim(0.00, 1.00)
+```
+
+# Take-away Lesson  
+This lab demonstrates some questions you need to ask yourself when conducting t-test and interpreting its results. In several cases, especially when you analyze data without a good understanding of the design of experiments, T-test can lead to some unreliable conclusions. Fortunately, there are some good alternatives to t-test. One of the most common options is *ANOVA*. The second lab (*Lab 02: ANOVA*) will use *ANOVA* to analyze the same data and demonstrate how this technique can give a more thorough analysis of our data.   
+
