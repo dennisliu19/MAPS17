@@ -19,7 +19,8 @@ ui <- dashboardPage(
                selectInput('response',"Response Variable", choices = responsechoice),
                selectizeInput('transformation',"Data Transformation", choices = transformation, selected = "none",multiple=FALSE)
       )
-    ,tabName = "byfactor")
+    ,tabName = "byfactor"),
+    htmlOutput("text")
   )
   )
   ,

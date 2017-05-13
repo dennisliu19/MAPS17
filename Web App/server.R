@@ -138,4 +138,10 @@ function(input, output,session) {
         return (isolate(cbind(variable = c(levelname(input$factor), input$additional_factor, "Residuals"), data.table(anova(lm(transformation ~ Factor+ttestdata()[,input$additional_factor], data = ttestdata()))))))
       }
     }, options = list(scrollX = TRUE))
+  
+  output$text <- renderUI({
+    author <- HTML("<b>","Author:","</b>")
+    name <- HTML(paste("Dennis Liu","Minh Trang"))
+    HTML(paste(c(author,name,sep="\n")))
+  })
 }
