@@ -1,9 +1,9 @@
 library(shiny)
-
 library(data.table)
 library(dplyr) 
 tangram <- fread("http://statgames.tietronix.com/tangrams/webreporter.php?game=tangrams&GroupName=&winlose=both&random=false&rows=&type=csv")
-#tangram <- read.csv("tangrams_data.csv",stringsAsFactors = FALSE)
+###If the link does not work, please use the local file instead. 
+###tangram <- read.csv("tangrams_data.csv",stringsAsFactors = FALSE)
 factorchoice <- c("Gender" = "level_gender",
             "STEM" = "level_stem",
             "Athlete"="level_athl")
@@ -120,4 +120,18 @@ convertMenuItem <- function(mi,tabName) {
   mi$children[[1]]$attribs['data-toggle']="tab"
   mi$children[[1]]$attribs['data-value'] = tabName
   mi
+}
+
+### Convert level name function
+levelname <- function(name){
+  if (name == "level_gender"){
+    result <- "Gender" 
+  } 
+  if (name == "level_stem"){
+    result <- "STEM"
+  }
+  if (name == "level_athl"){
+    result <- "Athletes"
+  }
+  return(result)
 }

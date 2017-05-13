@@ -133,11 +133,9 @@ function(input, output,session) {
       return (isolate(anova(transformation ~ Factor, data = ttestdata())))
     } else {
       if (length(unique(ttestdata()[,input$additional_factor])) < 2) {
-        return (isolate(data.table(variable = c(input$Factor),
-                                   anova(lm(transformation ~ Factor, data = ttestdata())))))
+        return (isolate(anova(lm(transformation ~ Factor, data = ttestdata()))))
       } else {
-        return (isolate(data.table(variable = c(input$Factor,input$additional_factor),
-                                   (anova(lm(transformation ~ Factor+ttestdata()[,input$additional_factor], data = ttestdata()))))))
+        return (isolate(cbind(variable = c(levelname(input$factor), input$additional_factor, "Residuals"), data.table(anova(lm(transformation ~ Factor+ttestdata()[,input$additional_factor], data = ttestdata()))))))
       }
     }, options = list(scrollX = TRUE))
 }
